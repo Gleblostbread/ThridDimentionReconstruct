@@ -68,11 +68,11 @@ class VisAndGen:
             self.save_data_and_graph()
 
     def gen_planes(self, pos: int = 1) -> Tuple[NDArray, NDArray, NDArray, np.float64]:
-        normal = np.random.random(3)
+        normal = 2*np.random.random(3) - 1
         normal/= np.linalg.norm(normal)
 
         projections = self.points@normal
-        plane_bias = pos*2*np.max(projections) 
+        plane_bias = pos*5*np.max(projections) 
 
         if normal[0] < 0.9:
             a = np.array([1, 0, 0])
