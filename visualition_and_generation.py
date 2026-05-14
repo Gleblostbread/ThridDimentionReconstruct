@@ -1,31 +1,60 @@
+from typing import List, Tuple
+from numpy.typing import NDArray
 import plotly.graph_objects as go
 import numpy as np
 
+class VisAndGen:
+    def __init__(self, points_count: int, cov_matrix: NDArray, planes_count: int):
+        self.points: NDArray = np.random.multivariate_normal(
+            mean = [0, 0, 0],
+            cov = cov_matrix,
+            size=points_count
+        )
+        self.normal: List[NDArray] = []
+        self.basis: List[Tuple[NDArray, NDArray]] = []
+        self.plain_bias: List[np.float64] = []
+        self.projections: List[NDArray] = []
+        self.coords_2d: List[NDArray] = []
+
+        for i in range(planes_count):
+            tmp_normal, tmp_basis_1, tmp_basis_2, tmp_plane_bias = self.gen_planes((-1)**i)
+            tmp_projections, tmp_coords_2d = self.calc_projections(tmp_normal, tmp_basis_1, tmp_basis_2, tmp_plane_bias)
+
+            self.normal.append(tmp_normal)
+            self.basis.append((tmp_basis_1, tmp_basis_2))
+            self.plain_bias.append(tmp_plane_bias)
+            self.projections.append(tmp_projections)
+            self.coords_2d.append(tmp_coords_2d)
 
 
-def gen_planes(points: np.ndarray, pos: int = 1):
-    normal = np.random.random(3)
-    normal/= np.linalg.norm(normal)
+    def gen_planes(self, pos: int = 1) -> Tuple[NDArray, NDArray, NDArray, np.float64]:
+        normal = np.random.random(3)
+        normal/= np.linalg.norm(normal)
 
-    projections = points@normal
+        projections = self.points@normal
 
-    plane_bias = pos*2*np.max(projections) #- 0.1*np.min(projections)
+        plane_bias = pos*2*np.max(projections) #- 0.1*np.min(projections)
 
-    if normal[0] < 0.9:
-        a = np.array([1, 0, 0])
-    else:
-        a = np.array([0, 1, 0])
-
-
-    basis_1 = (a - (a @ normal)*normal)
-    basis_1 /= np.linalg.norm(basis_1)
-
-    basis_2 = np.cross(normal, basis_1)
-
-    return normal, basis_1, basis_2, plane_bias
+        if normal[0] < 0.9:
+            a = np.array([1, 0, 0])
+        else:
+            a = np.array([0, 1, 0])
 
 
-def create_planes_mesh(normal: np.ndarray, basis_1: np.ndarray, basis_2: np.ndarray, plane_bias: np.float64, size: float = 2, resolution: int = 10):
+        basis_1 = (a - (a @ normal)*normal)
+        basis_1 /= np.linalg.norm(basis_1)
+
+        basis_2 = np.cross(normal, basis_1)
+
+        return normal, basis_1, basis_2, plane_bias
+    
+    def calc_projections(self, normal: NDArray, basis_1: NDArray, basis_2: NDArray, plane_bias: np.float64) -> Tuple[NDArray, NDArray]:
+        projections = self.points - (np.sum(normal*self.points, axis=1) - plane_bias).reshape((self.points.shape[0], 1))*normal
+        coords_2d = np.column_stack((np.sum(basis_1*projections, axis=1), np.sum(basis_2*projections, axis=1)))
+        return projections, coords_2d
+
+
+def create_planes_mesh(normal: NDArray, basis_1: NDArray, basis_2: NDArray, plane_bias: np.float64, size: float = 2, resolution: int = 10):
     p0 = normal*plane_bias
 
     s = np.linspace(-size, size, resolution)
@@ -38,12 +67,6 @@ def create_planes_mesh(normal: np.ndarray, basis_1: np.ndarray, basis_2: np.ndar
     Z = p0[2] + S*basis_1[2] + T*basis_2[2]
     
     return X, Y, Z
-
-
-def calc_projections(points:np.ndarray, normal: np.ndarray, basis_1: np.ndarray, basis_2: np.ndarray, plane_bias: np.float64):
-    projections = points - (np.sum(normal*points, axis=1) - plane_bias).reshape((points.shape[0], 1))*normal
-    coords_2d = np.column_stack((np.sum(basis_1*projections, axis=1), np.sum(basis_2*projections, axis=1)))
-    return projections, coords_2d
     
 
 def add_basis_vectors(fig, point, u, v, scale=1.5, color_u='red', color_v='green'):
@@ -72,27 +95,13 @@ def add_basis_vectors(fig, point, u, v, scale=1.5, color_u='red', color_v='green
 
 
 def main():
-    points_true = np.random.multivariate_normal(
-        mean = [0, 0, 0],
-        cov = [[2, 2, -0.5],
-               [2, 5, -3],
-               [-0.5, -3, 3]],
-        size=100
-    )
+    points_count = 17
+    cov_matrix = np.array([[2,      2,    -0.5],
+                           [2,      5,    -3],
+                           [-0.5,  -3,     3]])
+    planes_count = 2
 
-    normal, basis_1, basis_2, plane_bias = gen_planes(points_true, pos=1)
-
-    X, Y, Z = create_planes_mesh(normal, basis_1, basis_2, plane_bias, size=10)
-
-    projections_1, coords_2d = calc_projections(points_true, normal, basis_1, basis_2, plane_bias)
-
-    print(coords_2d)
-
-    normal_2, basis_21, basis_22, plane_bias_2 = gen_planes(points_true, pos=-1)
-
-    X2, Y2, Z2 = create_planes_mesh(normal_2, basis_21, basis_22, plane_bias_2, size=10)
-
-    projections_2, coords_2d_2 = calc_projections(points_true, normal_2, basis_21, basis_22, plane_bias_2)
+    vis_and_gen = VisAndGen(points_count, cov_matrix, planes_count)
     
     fig = go.Figure()
 
@@ -111,7 +120,7 @@ def main():
     )
 
     fig.add_trace(go.Scatter3d(
-        x=points_true[:, 0], y=points_true[:, 1], z=points_true[:, 2],
+        x=vis_and_gen.points[:, 0], y=vis_and_gen.points[:, 1], z=vis_and_gen.points[:, 2],
         mode='markers',
         marker=dict(
             size=4,
@@ -125,7 +134,7 @@ def main():
 
     # Проекции
     fig.add_trace(go.Scatter3d(
-        x=projections_1[:, 0], y=projections_1[:, 1], z=projections_1[:, 2],
+        x=vis_and_gen.projections[0][:, 0], y=vis_and_gen.projections[0][:, 1], z=vis_and_gen.projections[0][:, 2],
         mode='markers',
         marker=dict(
             size=4,
@@ -137,7 +146,7 @@ def main():
         name='Projections'
     ))
     fig.add_trace(go.Scatter3d(
-        x=projections_2[:, 0], y=projections_2[:, 1], z=projections_2[:, 2],
+        x=vis_and_gen.projections[1][:, 0], y=vis_and_gen.projections[1][:, 1], z=vis_and_gen.projections[1][:, 2],
         mode='markers',
         marker=dict(
             size=4,
@@ -149,6 +158,9 @@ def main():
         name='Projections'
     ))
 
+    X, Y, Z = create_planes_mesh(vis_and_gen.normal[0], vis_and_gen.basis[0][0], vis_and_gen.basis[0][1], vis_and_gen.plain_bias[0], size = 10, resolution = 10)
+    X2, Y2, Z2 = create_planes_mesh(vis_and_gen.normal[1], vis_and_gen.basis[1][0], vis_and_gen.basis[1][1], vis_and_gen.plain_bias[1], size = 10, resolution = 10)
+
     # Плоскости
     fig.add_trace(go.Surface(x=X, y=Y, z=Z, opacity=0.25, colorscale='Greens', 
     showscale=False, name='Plane', hoverinfo='skip'))
@@ -156,8 +168,8 @@ def main():
     showscale=False, name='Plane', hoverinfo='skip'))
 
     # Базисы
-    add_basis_vectors(fig, normal*plane_bias, basis_1, basis_2, scale=1.5, color_u='yellow', color_v='green')
-    add_basis_vectors(fig, normal_2*plane_bias_2, basis_21, basis_22, scale=1.5, color_u='yellow', color_v='green')
+    add_basis_vectors(fig, vis_and_gen.normal[0]*vis_and_gen.plain_bias[0], vis_and_gen.basis[0][0], vis_and_gen.basis[0][1], scale=1.5, color_u='yellow', color_v='green')
+    add_basis_vectors(fig, vis_and_gen.normal[1]*vis_and_gen.plain_bias[1], vis_and_gen.basis[1][0], vis_and_gen.basis[1][1], scale=1.5, color_u='yellow', color_v='green')
     fig.show()
 
 
