@@ -1,7 +1,9 @@
 from typing import List, Tuple
 from numpy.typing import NDArray
+from datetime import datetime
 import plotly.graph_objects as go
 import numpy as np
+import os
 
 
 def create_planes_mesh(normal: NDArray, basis_1: NDArray, basis_2: NDArray, plane_bias: np.float64, size: float = 2, resolution: int = 10):
@@ -19,7 +21,8 @@ def create_planes_mesh(normal: NDArray, basis_1: NDArray, basis_2: NDArray, plan
 
 
 class VisAndGen:
-    def __init__(self, points_count: int, cov_matrix: NDArray, planes_count: int, auto_visualize: bool = False):
+    def __init__(self, points_count: int, cov_matrix: NDArray, planes_count: int, 
+                 auto_visualize: bool = False, save: bool = False, save_folder: str | None = None):
         self.points: NDArray = np.random.multivariate_normal(
             mean = [0, 0, 0],
             cov = cov_matrix,
@@ -31,6 +34,7 @@ class VisAndGen:
         self.plain_bias: List[np.float64] = []
         self.projections: List[NDArray] = []
         self.coords_2d: List[NDArray] = []
+        self.save_folder = save_folder
 
         for i in range(planes_count):
             tmp_normal, tmp_basis_1, tmp_basis_2, tmp_plane_bias = self.gen_planes((-1)**i)
@@ -44,24 +48,24 @@ class VisAndGen:
 
         self.fig = go.Figure()
 
-        # Общие настройки сцены
         self.fig.update_layout(
             scene=dict(
                 xaxis_title='X', yaxis_title='Y', zaxis_title='Z',
-                aspectmode='data',  # Сохранять пропорции осей
+                aspectmode='data', 
                 camera=dict(
-                    eye=dict(x=1.5, y=1.5, z=1.5),  # Позиция камеры
+                    eye=dict(x=1.5, y=1.5, z=1.5),  
                     up=dict(x=0, y=0, z=1),  
                 )
             ),
-            width=800, height=600,
+            width=1920, height=1080,
             margin=dict(r=10, l=10, b=10, t=10)
         )
 
         if auto_visualize:
             self.visualize()
-
-
+        
+        if save:
+            self.save_data_and_graph()
 
     def gen_planes(self, pos: int = 1) -> Tuple[NDArray, NDArray, NDArray, np.float64]:
         normal = np.random.random(3)
@@ -107,7 +111,6 @@ class VisAndGen:
             X, Y, Z = create_planes_mesh(self.normal[ind], self.basis[ind][0], self.basis[ind][1], self.plain_bias[ind], size = 10, resolution = 10)
             self.fig.add_trace(go.Surface(x=X, y=Y, z=Z, opacity=0.25, colorscale='Greens', 
                 showscale=False, name=f'Плоскость {ind+1}', hoverinfo='skip'))
-            
 
     def visualize_projections(self):
         for ind in range(self.planes_count):
@@ -152,15 +155,43 @@ class VisAndGen:
         self.visualize_basis_vectors()
         self.fig.show()
 
+    def save_data_and_graph(self):
+        now = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+        if self.save_folder is None:
+            dir_path = os.path.dirname(os.path.abspath(__file__))
+            self.save_folder = os.path.join(dir_path, 'data', f'experiment_{now}')
+            os.makedirs(self.save_folder, exist_ok=True)
+        
+        if self.visualize:
+            self.fig.update_layout(scene_camera=dict(
+                eye=dict(x=2, y=2, z=1.5),      
+                up=dict(x=0, y=0, z=1),          
+                center=dict(x=0, y=0, z=0)       
+            ))
+
+            self.fig.write_html(
+                file=os.path.join(self.save_folder, "plot.html"),
+                include_plotlyjs=True,          
+                full_html=True,                     
+                include_mathjax=False               
+            )
+
+        np.save(os.path.join(self.save_folder, "points.npy"), self.points)
+        np.save(os.path.join(self.save_folder, "coords_2d.npy"), np.array(self.coords_2d))
+        np.save(os.path.join(self.save_folder, "normal.npy"), np.array(self.normal))
+        np.save(os.path.join(self.save_folder, "basis.npy"), np.array(self.basis))
+        np.save(os.path.join(self.save_folder, "plain_bias.npy"), np.array(self.plain_bias))
+        np.save(os.path.join(self.save_folder, "projections.npy"), np.array(self.projections))
+        
 
 def main():
     points_count = 17
     cov_matrix = np.array([[2,      2,    -0.5],
                            [2,      5,    -3],
                            [-0.5,  -3,     3]])
-    planes_count = 10
+    planes_count = 4
 
-    vis_and_gen = VisAndGen(points_count, cov_matrix, planes_count, auto_visualize=True)
+    vis_and_gen = VisAndGen(points_count, cov_matrix, planes_count, auto_visualize=True, save=True)
 
 
 if __name__ == "__main__":
