@@ -88,12 +88,8 @@ def main():
                        2*(m1[0]*m1[1] - m2[0]*m2[1]),
                        2*(m1[0]*m1[2] - m2[0]*m2[2]),
                        2*(m1[1]*m1[2] - m2[1]*m2[2])])
+        
     C = np.array(C_rows)
-
-    # Whitening для устойчивости SVD
-    row_norms = np.linalg.norm(C, axis=1, keepdims=True)
-    row_norms[row_norms < 1e-12] = 1.0
-    C = C / row_norms
 
     _, _, Vt_C = np.linalg.svd(C, full_matrices=False)
     a = Vt_C[-1, :]
