@@ -8,6 +8,7 @@ def align_via_procrustes_anchors(source, target, anchor_indices):
     """
     Вычисляет преобразование подобия ТОЛЬКО по якорным точкам,
     затем применяет его ко всему облаку source.
+    Алгоритм Кабша — Прокруста
     """
     idx = np.array(anchor_indices)
     src_anchors = source[idx]
