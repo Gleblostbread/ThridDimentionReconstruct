@@ -10,7 +10,7 @@ import os
 
 def main():
     dir_path = os.path.dirname(__file__)
-    data_path = os.path.join(dir_path, 'data', 'experiment_1')
+    data_path = os.path.join(dir_path, 'experiment_1')
     
     true_points: NDArray = np.load(os.path.join(data_path, 'points.npy'))
     
