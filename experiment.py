@@ -1,6 +1,4 @@
 from numpy.typing import NDArray
-from typing import Annotated
-from os import PathLike
 from tomasi_kanade import TomasiKanade
 import plotly.graph_objects as go
 import numpy as np
