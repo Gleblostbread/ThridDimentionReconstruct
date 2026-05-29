@@ -1,10 +1,10 @@
 from numpy.typing import NDArray
 from os import PathLike
 import numpy as np
-import os
 
 
 FilePath = str | PathLike
+
 
 class TomasiKanade:
     def __init__(self, data: FilePath | NDArray[np.float64], true_coords: FilePath | NDArray[np.float64] | None = None):
